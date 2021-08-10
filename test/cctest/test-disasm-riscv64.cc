@@ -404,6 +404,8 @@ TEST(RV64D) {
 }
 
 TEST(PSEUDO) {
+  bool c_ext = FLAG_riscv_c_extension;
+  FLAG_riscv_c_extension = false;
   SET_UP();
   // pseodu instructions according to rISCV assembly programmer's handbook
   COMPARE(nop(), "00000013       nop");
@@ -462,6 +464,7 @@ TEST(PSEUDO) {
   COMPARE(fsflags(s1), "00149073       fsflags   s1");
 
   VERIFY_RUN();
+  if(c_ext) FLAG_riscv_c_extension = true;
 }
 
 TEST(RV64C) {

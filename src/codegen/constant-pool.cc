@@ -545,9 +545,11 @@ void ConstantPool::EmitAndClear(Jump require_jump) {
   if (require_jump == Jump::kRequired) assm_->b(&after_pool);
 
   assm_->RecordComment("[ Constant Pool");
-
+  //printf("cp 1: %d\n",assm_->pc_offset());
   EmitPrologue(require_alignment);
+  //printf("cp 2: %d\n",assm_->pc_offset());
   if (require_alignment == Alignment::kRequired) assm_->DataAlign(kInt64Size);
+  //printf("cp 3: %d\n",assm_->pc_offset());
   EmitEntries();
   assm_->RecordComment("]");
   assm_->bind(&after_pool);
@@ -593,6 +595,9 @@ void ConstantPool::SetNextCheckIn(size_t instructions) {
 
 void ConstantPool::EmitEntries() {
   for (auto iter = entries_.begin(); iter != entries_.end();) {
+    if(!(iter->first.is_value32() || IsAligned(assm_->pc_offset(), 8))){
+      printf("assm_->pc_offset(): %d\n",assm_->pc_offset());
+    }
     DCHECK(iter->first.is_value32() || IsAligned(assm_->pc_offset(), 8));
     auto range = entries_.equal_range(iter->first);
     bool shared = iter->first.AllowsDeduplication();
@@ -670,6 +675,7 @@ int ConstantPool::ComputeSize(Jump require_jump,
 Alignment ConstantPool::IsAlignmentRequiredIfEmittedAt(Jump require_jump,
                                                        int pc_offset) const {
   int size_up_to_marker = PrologueSize(require_jump);
+  //printf("IsAlignmentRequiredIfEmittedAt: size_up_to_marker: %d, pc_offset: %d\n",size_up_to_marker,pc_offset);
   if (Entry64Count() != 0 &&
       !IsAligned(pc_offset + size_up_to_marker, kInt64Size)) {
     return Alignment::kRequired;

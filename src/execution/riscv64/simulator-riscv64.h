@@ -208,7 +208,9 @@ class SimInstruction : public InstructionGetters<SimInstructionBase> {
   explicit SimInstruction(Instruction* instr) { *this = instr; }
 
   SimInstruction& operator=(Instruction* instr) {
+    //printf("[ operator=: %d\n",instr->InstructionBits());
     operand_ = *reinterpret_cast<const int32_t*>(instr);
+    //printf("]s operator=:\n");
     instr_ = instr;
     type_ = InstructionBase::InstructionType();
     DCHECK(reinterpret_cast<void*>(&operand_) == this);

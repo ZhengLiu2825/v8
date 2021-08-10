@@ -210,7 +210,7 @@ class V8_EXPORT_PRIVATE Assembler : public AssemblerBase {
 
   // Get offset from instr.
   int BranchOffset(Instr instr);
-  static int BrachlongOffset(Instr auipc, Instr jalr);
+  static int BranchlongOffset(Instr auipc, Instr jalr);
   static int PatchBranchlongOffset(Address pc, Instr auipc, Instr instr_I,
                                    int32_t offset);
   int JumpOffset(Instr instr);
@@ -385,8 +385,8 @@ class V8_EXPORT_PRIVATE Assembler : public AssemblerBase {
   void auipc(Register rd, int32_t imm20);
 
   // Jumps
-  void jal(Register rd, int32_t imm20);
-  void jalr(Register rd, Register rs1, int16_t imm12);
+  void jal(Register rd, int32_t imm20, bool apply_c_extension = false);
+  void jalr(Register rd, Register rs1, int16_t imm12, bool apply_c_extension = false);
 
   // Branches
   void beq(Register rs1, Register rs2, int16_t imm12);
@@ -725,19 +725,22 @@ class V8_EXPORT_PRIVATE Assembler : public AssemblerBase {
     bleu(rs1, rs2, branch_offset(L));
   }
 
-  void j(int32_t imm21) { jal(zero_reg, imm21); }
-  inline void j(Label* L) { j(jump_offset(L)); }
-  inline void b(Label* L) { j(L); }
+  void j(int32_t imm21, bool apply_c_extension = false) { jal(zero_reg, imm21, apply_c_extension); }
+  inline void j(Label* L, bool apply_c_extension = false) { 
+    if(L != nullptr && !L->is_bound()) j(jump_offset(L)); 
+    else j(jump_offset(L), apply_c_extension); 
+  }
+  inline void b(Label* L, bool apply_c_extension = false) { j(L, apply_c_extension); }
   void jal(int32_t imm21) { jal(ra, imm21); }
   inline void jal(Label* L) { jal(jump_offset(L)); }
-  void jr(Register rs) { jalr(zero_reg, rs, 0); }
-  void jr(Register rs, int32_t imm12) { jalr(zero_reg, rs, imm12); }
-  void jalr(Register rs, int32_t imm12) { jalr(ra, rs, imm12); }
-  void jalr(Register rs) { jalr(ra, rs, 0); }
-  void ret() { jalr(zero_reg, ra, 0); }
-  void call(int32_t offset) {
+  void jr(Register rs, bool apply_c_extension = false) { jalr(zero_reg, rs, 0, apply_c_extension); }
+  void jr(Register rs, int32_t imm12, bool apply_c_extension = false) { jalr(zero_reg, rs, imm12, apply_c_extension); }
+  void jalr(Register rs, int32_t imm12, bool apply_c_extension = false) { jalr(ra, rs, imm12, apply_c_extension); }
+  void jalr(Register rs, bool apply_c_extension = false) { jalr(ra, rs, 0, apply_c_extension); }
+  void ret(bool apply_c_extension = false) { jalr(zero_reg, ra, 0, apply_c_extension); }
+  void call(int32_t offset, bool apply_c_extension = false) {
     auipc(ra, (offset >> 12) + ((offset & 0x800) >> 11));
-    jalr(ra, ra, offset << 20 >> 20);
+    jalr(ra, ra, offset << 20 >> 20, apply_c_extension);
   }
 
   // Read instructions-retired counter
@@ -786,7 +789,10 @@ class V8_EXPORT_PRIVATE Assembler : public AssemblerBase {
 
   // Check the number of instructions generated from label to here.
   int InstructionsGeneratedSince(Label* label) {
-    return SizeOfCodeGeneratedSince(label) / kInstrSize;
+    //return SizeOfCodeGeneratedSince(label) / kInstrSize;
+    int num = SizeOfCodeGeneratedSince(label) / kInstrSize;
+    DCHECK_EQ(num * kInstrSize, SizeOfCodeGeneratedSince(label));
+    return num;
   }
 
   using BlockConstPoolScope = ConstantPool::BlockScope;

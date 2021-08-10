@@ -139,7 +139,7 @@ class V8_EXPORT_PRIVATE TurboAssembler : public TurboAssemblerBase {
 
   // Cases when relocation is not needed.
 #define DECLARE_NORELOC_PROTOTYPE(Name, target_type) \
-  void Name(target_type target);                     \
+  void Name(target_type target, bool apply_c_extension = false);                     \
   void Name(target_type target, COND_TYPED_ARGS);
 
 #define DECLARE_BRANCH_PROTOTYPES(Name)   \
@@ -149,7 +149,7 @@ class V8_EXPORT_PRIVATE TurboAssembler : public TurboAssemblerBase {
   DECLARE_BRANCH_PROTOTYPES(BranchAndLink)
   DECLARE_BRANCH_PROTOTYPES(BranchShort)
 
-  void Branch(Label* target);
+  void Branch(Label* target, bool apply_c_extension = false);
   void Branch(int32_t target);
   void Branch(Label* target, Condition cond, Register r1, const Operand& r2,
               Label::Distance near_jump = Label::kFar);
@@ -216,19 +216,19 @@ class V8_EXPORT_PRIVATE TurboAssembler : public TurboAssemblerBase {
   Condition cond = al, Register rs = zero_reg, \
             const Operand &rt = Operand(zero_reg)
 
-  void Jump(Register target, COND_ARGS);
-  void Jump(intptr_t target, RelocInfo::Mode rmode, COND_ARGS);
-  void Jump(Address target, RelocInfo::Mode rmode, COND_ARGS);
+  void Jump(Register target, bool apply_c_extension = false, COND_ARGS);
+  void Jump(intptr_t target, RelocInfo::Mode rmode, bool apply_c_extension = false, COND_ARGS);
+  void Jump(Address target, RelocInfo::Mode rmode, bool apply_c_extension = false, COND_ARGS);
   // Deffer from li, this method save target to the memory, and then load
   // it to register use ld, it can be used in wasm jump table for concurrent
   // patching.
   void PatchAndJump(Address target);
-  void Jump(Handle<Code> code, RelocInfo::Mode rmode, COND_ARGS);
-  void Jump(const ExternalReference& reference);
-  void Call(Register target, COND_ARGS);
-  void Call(Address target, RelocInfo::Mode rmode, COND_ARGS);
-  void Call(Handle<Code> code, RelocInfo::Mode rmode = RelocInfo::CODE_TARGET,
-            COND_ARGS);
+  void Jump(Handle<Code> code, RelocInfo::Mode rmode, bool apply_c_extension = false, COND_ARGS);
+  void Jump(const ExternalReference& reference, bool apply_c_extension = false);
+  void Call(Register target, bool apply_c_extension = false, COND_ARGS);
+  void Call(Address target, RelocInfo::Mode rmode, bool apply_c_extension = false, COND_ARGS);
+  void Call(Handle<Code> code, RelocInfo::Mode rmode = RelocInfo::CODE_TARGET, 
+            bool apply_c_extension = false, COND_ARGS);
   void Call(Label* target);
   void LoadAddress(
       Register dst, Label* target,
@@ -928,7 +928,7 @@ class V8_EXPORT_PRIVATE TurboAssembler : public TurboAssemblerBase {
   bool CalculateOffset(Label* L, int32_t* offset, OffsetSize bits,
                        Register* scratch, const Operand& rt);
 
-  void BranchShortHelper(int32_t offset, Label* L);
+  void BranchShortHelper(int32_t offset, Label* L, bool apply_c_extension = false);
   bool BranchShortHelper(int32_t offset, Label* L, Condition cond, Register rs,
                          const Operand& rt);
   bool BranchShortCheck(int32_t offset, Label* L, Condition cond, Register rs,
@@ -1267,6 +1267,8 @@ void TurboAssembler::GenerateSwitchTable(Register index, size_t case_count,
 
   Align(8);
   // Load the address from the jump table at index and jump to it
+  // bool c_ext = FLAG_riscv_apply_c_extension;
+  // FLAG_riscv_apply_c_extension = false;
   auipc(scratch, 0);  // Load the current PC into scratch
   slli(scratch2, index,
        kSystemPointerSizeLog2);  // scratch2 = offset of indexth entry
@@ -1277,6 +1279,7 @@ void TurboAssembler::GenerateSwitchTable(Register index, size_t case_count,
                        // offset, then load
   jr(scratch2);        // Jump to the address loaded from the table
   nop();               // For 16-byte alignment
+  // if(c_ext) FLAG_riscv_apply_c_extension = true;
   for (size_t index = 0; index < case_count; ++index) {
     dd(GetLabelFunction(index));
   }

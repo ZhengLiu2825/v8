@@ -237,7 +237,14 @@ void Assembler::GetCode(Isolate* isolate, CodeDesc* desc,
   // TODO(jgruber): Consider moving responsibility for proper alignment to
   // metadata table builders (safepoint, handler, constant pool, code
   // comments).
+
   DataAlign(Code::kMetadataAlignment);
+  // if(FLAG_riscv_c_extension){
+  //   DataAlign(Code::kShortMetadataAlignment);
+  // }
+  // else{
+  //   DataAlign(Code::kMetadataAlignment);
+  // }
 
   ForceConstantPoolEmissionWithoutJump();
 
@@ -411,7 +418,7 @@ int Assembler::target_at(int pos, bool is_internal) {
       Instr instr_auipc = instr;
       Instr instr_I = instr_at(pos + 4);
       DCHECK(IsJalr(instr_I) || IsAddi(instr_I));
-      int32_t offset = BrachlongOffset(instr_auipc, instr_I);
+      int32_t offset = BranchlongOffset(instr_auipc, instr_I);
       if (offset == kEndOfJumpChain) return kEndOfChain;
       return offset + pos;
     } break;
@@ -743,7 +750,7 @@ int Assembler::CJumpOffset(Instr instr) {
   return imm12;
 }
 
-int Assembler::BrachlongOffset(Instr auipc, Instr instr_I) {
+int Assembler::BranchlongOffset(Instr auipc, Instr instr_I) {
   DCHECK(reinterpret_cast<Instruction*>(&instr_I)->InstructionType() ==
          InstructionBase::kIType);
   DCHECK(IsAuipc(auipc));
@@ -765,7 +772,7 @@ int Assembler::PatchBranchlongOffset(Address pc, Instr instr_auipc,
   instr_at_put(pc, SetAuipcOffset(Hi20, instr_auipc));
   instr_at_put(pc + 4, SetJalrOffset(Lo12, instr_jalr));
   DCHECK(offset ==
-         BrachlongOffset(Assembler::instr_at(pc), Assembler::instr_at(pc + 4)));
+         BranchlongOffset(Assembler::instr_at(pc), Assembler::instr_at(pc + 4)));
   return 2;
 }
 
@@ -1374,14 +1381,35 @@ void Assembler::auipc(Register rd, int32_t imm20) {
 
 // Jumps
 
-void Assembler::jal(Register rd, int32_t imm21) {
-  GenInstrJ(JAL, rd, imm21);
-  BlockTrampolinePoolFor(1);
+void Assembler::jal(Register rd, int32_t imm21, bool apply_c_extension) {
+  // GenInstrJ(JAL, rd, imm21);
+  // BlockTrampolinePoolFor(1);
+  if(FLAG_riscv_c_extension && rd == zero_reg && is_int12(imm21) && 
+    (imm21 & 0b01) == 0 && apply_c_extension) {
+    int16_t imm12 = imm21;
+    c_j(imm12);
+  }
+  else {
+    GenInstrJ(JAL, rd, imm21);
+    BlockTrampolinePoolFor(1);
+  }
 }
 
-void Assembler::jalr(Register rd, Register rs1, int16_t imm12) {
-  GenInstrI(0b000, JALR, rd, rs1, imm12);
-  BlockTrampolinePoolFor(1);
+void Assembler::jalr(Register rd, Register rs1, int16_t imm12, bool apply_c_extension) {
+  // GenInstrI(0b000, JALR, rd, rs1, imm12);
+  // BlockTrampolinePoolFor(1);
+  if(FLAG_riscv_c_extension && rd == zero_reg && rs1 != zero_reg && 
+    imm12 == 0 && apply_c_extension) {
+    c_jr(rs1);
+  }
+  else if(FLAG_riscv_c_extension && rd.code() == 0b01 && rs1 != zero_reg && 
+         imm12 == 0 && apply_c_extension) {
+    c_jalr(rs1);
+  }
+  else {
+    GenInstrI(0b000, JALR, rd, rs1, imm12);
+    BlockTrampolinePoolFor(1);
+  }
 }
 
 // Branches
@@ -2774,7 +2802,7 @@ void Assembler::RelocateRelativeReference(RelocInfo::Mode rmode, Address pc,
   DCHECK(RelocInfo::IsRelativeCodeTarget(rmode));
   if (IsAuipc(instr) && IsJalr(instr1)) {
     int32_t imm;
-    imm = BrachlongOffset(instr, instr1);
+    imm = BranchlongOffset(instr, instr1);
     imm -= pc_delta;
     PatchBranchlongOffset(pc, instr, instr1, imm);
     return;
@@ -2925,8 +2953,11 @@ void Assembler::CheckTrampolinePool() {
         DCHECK(is_int32(imm64));
         int32_t Hi20 = (((int32_t)imm64 + 0x800) >> 12);
         int32_t Lo12 = (int32_t)imm64 << 20 >> 20;
+        // bool c_ext = FLAG_riscv_apply_c_extension;
+        // FLAG_riscv_apply_c_extension = false;
         auipc(t6, Hi20);  // Read PC + Hi20 into t6
         jr(t6, Lo12);     // jump PC + Hi20 + Lo12
+        //if(c_ext) FLAG_riscv_apply_c_extension = true;
       }
       // If unbound_labels_count_ is big enough, label after_pool will
       // need a trampoline too, so we must create the trampoline before

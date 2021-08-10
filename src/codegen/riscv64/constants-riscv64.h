@@ -743,6 +743,8 @@ class InstructionBase {
   }
 
   inline bool IsShortInstruction() const {
+    // const uint8_t* a = reinterpret_cast<const uint8_t*>(this);
+    // uint8_t FirstByte = *a;
     uint8_t FirstByte = *reinterpret_cast<const uint8_t*>(this);
     return (FirstByte & 0x03) <= C2;
   }

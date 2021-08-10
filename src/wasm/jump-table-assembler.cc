@@ -313,8 +313,16 @@ void JumpTableAssembler::EmitLazyCompileJumpSlot(uint32_t func_index,
   int start = pc_offset();
   li(kWasmCompileLazyFuncIndexRegister, func_index);  // max. 2 instr
   // Jump produces max. 8 instructions (include constant pool and j)
+  //temporary solution
+  // bool c_ext = FLAG_riscv_apply_c_extension;
+  // FLAG_riscv_apply_c_extension = false;
+  int cp = pc_offset();
   Jump(lazy_compile_target, RelocInfo::NONE);
+  // if(c_ext) FLAG_riscv_apply_c_extension = true;
   int nop_bytes = start + kLazyCompileTableSlotSize - pc_offset();
+  if(nop_bytes % kInstrSize!=0){
+    printf("EmitLazyCompileJumpSlot: %d %d %d\n",start, cp, pc_offset());
+  }
   DCHECK_EQ(nop_bytes % kInstrSize, 0);
   for (int i = 0; i < nop_bytes; i += kInstrSize) nop();
 }
